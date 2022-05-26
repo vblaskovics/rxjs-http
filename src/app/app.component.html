@@ -1,3 +1,5 @@
 <h1>Users</h1>
 
 <app-user></app-user>
+
+<p *ngFor="let post of $newPosts | async"> {{post.username}} - {{post.title}} </p>

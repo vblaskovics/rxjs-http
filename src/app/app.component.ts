@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { firstValueFrom, forkJoin, map, of, switchMap } from 'rxjs';
+import { firstValueFrom, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { Post } from './posts/post';
 import { PostService } from './posts/post.service';
 import { UserService } from './users/user.service';
@@ -13,6 +13,7 @@ type PostWithUsername = Post & { username: string };
 })
 export class AppComponent {
   title = 'rxjs-http';
+  $newPosts?: Observable<PostWithUsername[]>
 
   constructor(
     private userService: UserService,
@@ -20,43 +21,73 @@ export class AppComponent {
   ) {}
 
   ngOnInit() {
-    this.getPostsWithUsername();
-    this.getPostsWithUsernameStream();
+    // this.getPostsWithUsernameSubscribe()
+    // this.getPostsWithUsernameAwait();
+    // this.getPostsWithUsernameStream();
+    this.getPostsWithUsernameStream2();
   }
 
-  async getPostsWithUsername() {
+  getPostsWithUsernameSubscribe(): void {
+    this.userService.getUsers().subscribe((users) => {
+      this.postService.getPosts().subscribe((posts) => {
+        let newPosts: PostWithUsername[] = posts.map((p) => {
+          let user = users.find((u) => u.id === p.userId);
+          return { ...p, username: user ? user.username : '' };
+        });
+        console.log(newPosts);
+      });
+    });
+  }
+
+  async getPostsWithUsernameAwait() {
     let users = await firstValueFrom(this.userService.getUsers());
     let posts = await firstValueFrom(this.postService.getPosts());
 
     let newPosts: PostWithUsername[] = posts.map((p) => {
       let user = users.find((u) => u.id === p.userId);
-      return { ...p, username: user ? user?.username : '' };
+      return { ...p, username: user ? user.username : '' };
     });
-
-    console.log('ASYNC///////////////////////////');
-    console.log(newPosts[0].title, newPosts[0].username);
+    console.log(newPosts);
   }
-  
+
   getPostsWithUsernameStream() {
     let $newPosts = forkJoin({
       users: this.userService.getUsers(),
       posts: this.postService.getPosts(),
+    });
+
+    $newPosts.subscribe((res) => {
+      let users = res.users;
+      let posts = res.posts;
+
+      let newPosts: PostWithUsername[] = posts.map((p) => {
+        let user = users.find((u) => u.id === p.userId);
+        return { ...p, username: user ? user.username : '' };
+      });
+      console.log(newPosts);
+    });
+  }
+
+  getPostsWithUsernameStream2() {
+    this.$newPosts = forkJoin({
+      users: this.userService.getUsers(),
+      posts: this.postService.getPosts(),
     }).pipe(
       map((res) => {
-        let newPosts: PostWithUsername[] = res.posts.map((p) => {
-          let user = res.users.find((u) => u.id === p.userId);
-          return {
-            ...p,
-            username: user ? user?.username : '',
-          }
+        let users = res.users;
+        let posts = res.posts;
+
+        let newPosts: PostWithUsername[] = posts.map((p) => {
+          let user = users.find((u) => u.id === p.userId);
+          return { ...p, username: user ? user.username : '' };
         });
-        return newPosts;
+
+        return newPosts
       })
-      );
-      
-      $newPosts.subscribe((res) => {
-        console.log('STREAM ///////////////////////////');
-        console.log(res[0].title, res[0].username);
-      });
-    }
+    );
+
+    this.$newPosts.subscribe(res => {
+      console.log(res)
+    })
   }
+}
